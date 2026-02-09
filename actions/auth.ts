@@ -1,7 +1,8 @@
 
 "use server"
 
-import { signIn } from "@/auth"
+import { signIn, signOut } from "@/auth"
+import { AuthError } from "next-auth"
 import { prisma } from "@/lib/prisma"
 import { hash } from "bcryptjs"
 import { redirect } from "next/navigation"
@@ -47,8 +48,8 @@ export async function signup(prevState: any, formData: FormData) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function login(prevState: any, formData: FormData) {
-    const email = formData.get("email") as string
-    const password = formData.get("password") as string
+    const email = (formData.get("email") as string).trim()
+    const password = (formData.get("password") as string).trim()
 
     try {
         await signIn("credentials", {
@@ -57,9 +58,18 @@ export async function login(prevState: any, formData: FormData) {
             redirectTo: "/dashboard",
         })
     } catch (error) {
-        if ((error as Error).message.includes("CredentialsSignin")) {
-            return "Invalid credentials."
+        if (error instanceof AuthError) {
+            switch (error.type) {
+                case "CredentialsSignin":
+                    return "Invalid credentials."
+                default:
+                    return "Something went wrong."
+            }
         }
         throw error
     }
+}
+
+export async function logout() {
+    await signOut({ redirectTo: "/login" })
 }

@@ -40,3 +40,14 @@ export async function rejectUser(userId: string) {
 
     revalidatePath("/dashboard")
 }
+
+export async function revokeUser(userId: string) {
+    await checkAdmin()
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: { status: "REJECTED" },
+    })
+
+    revalidatePath("/dashboard")
+}
