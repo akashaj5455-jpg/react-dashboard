@@ -5,29 +5,36 @@ import { GoogleGenerativeAI } from "@google/generative-ai"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
-export async function generateStudyNotes(videoUrl: string) {
+export async function fetchVideoTranscript(videoUrl: string) {
     try {
-        // 1. Extract Video ID
         const videoId = extractVideoId(videoUrl)
         if (!videoId) {
             return { error: "Invalid YouTube URL" }
         }
 
-        // 2. Fetch Transcript
         const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId)
         const transcriptText = transcriptItems.map((item) => item.text).join(" ")
 
-        // 3. Truncate if too long (Gemini 1.5 Flash has a large context window, but good to be safe)
+        return { transcript: transcriptText }
+    } catch (error) {
+        console.error("Transcript Error:", error)
+        return { error: error instanceof Error ? error.message : "Failed to fetch transcript" }
+    }
+}
+
+export async function generateNotes(transcriptText: string) {
+    try {
+        // Truncate if too long (Gemini 1.5 Flash has a large context window, but good to be safe)
         // A rough char limit, can be adjusted based on model
         const maxLength = 30000
         const truncatedTranscript = transcriptText.substring(0, maxLength)
 
-        // 4. Generate Summary with Gemini
+        // Generate Summary with Gemini
         const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
 
         const prompt = `
         You are an expert student tutor. 
-        Analyze the following YouTube video transcript and create structured Study Notes.
+        Analyze the following text (video transcript) and create structured Study Notes.
         
         Format the output in clean Markdown:
         - Use # for the Main Title.
@@ -48,7 +55,7 @@ export async function generateStudyNotes(videoUrl: string) {
 
     } catch (error) {
         console.error("AI Generation Error:", error)
-        return { error: "Failed to generate notes. Please check if the video has captions enabled." }
+        return { error: "Failed to generate notes." }
     }
 }
 
