@@ -15,6 +15,9 @@ export default function DashboardLayout({
                         <Link href="/dashboard" className="flex items-center space-x-3 py-2.5 px-4 bg-slate-800/50 rounded-lg text-slate-100 transition-all hover:bg-slate-700/50 hover:translate-x-1">
                             <span>Overview</span>
                         </Link>
+                        <Link href="/dashboard/study" className="flex items-center space-x-3 py-2.5 px-4 bg-slate-800/50 rounded-lg text-slate-100 transition-all hover:bg-slate-700/50 hover:translate-x-1">
+                            <span>Study Notes (AI)</span>
+                        </Link>
                         {/* Add more links here */}
                     </nav>
                 </div>
