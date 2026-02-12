@@ -56,8 +56,14 @@ export async function generateNotes(transcriptText: string) {
         const maxLength = 30000
         const truncatedTranscript = transcriptText.substring(0, maxLength)
 
-        // Generate Summary with Gemini
-        const model = genAI.getGenerativeModel({ model: "gemini-1.5-flash" })
+        // List of models to try in order of preference
+        // We prioritize newer/better models, but fallback to lite/older ones on error
+        const modelsToTry = [
+            "gemini-2.0-flash",
+            "gemini-2.0-flash-lite",
+            "gemini-flash-latest",
+            "gemini-pro-latest"
+        ];
 
         const prompt = `
         You are an expert student tutor. 
@@ -74,15 +80,41 @@ export async function generateNotes(transcriptText: string) {
         ${truncatedTranscript}
         `
 
-        const result = await model.generateContent(prompt)
-        const response = await result.response
-        const text = response.text()
+        let lastError = null;
 
-        return { notes: text }
+        for (const modelName of modelsToTry) {
+            try {
+                console.log(`[AI] Trying model: ${modelName}`);
+                const model = genAI.getGenerativeModel({ model: modelName });
 
-    } catch (error) {
+                // Try generation with a short retry for transient 429s (optional but good)
+                // But mainly we rely on switching models if one is exhausted
+                const result = await model.generateContent(prompt);
+                const response = await result.response;
+                const text = response.text();
+
+                return { notes: text }; // Success! Return immediately
+
+            } catch (error: any) {
+                console.warn(`[AI] Failed with ${modelName}: ${error.message}`);
+                lastError = error;
+
+                // If it's a safety block or invalid prompt, don't retry other models
+                if (error.message.includes("SAFETY") || error.message.includes("BLOCKED")) {
+                    return { error: "Content blocked due to safety settings." };
+                }
+
+                // Continue to next model on 429 (Rate Limit) or 404 (Not Found)
+            }
+        }
+
+        // If we get here, all models failed
+        console.error("All AI models failed.");
+        throw lastError || new Error("All available AI models failed.");
+
+    } catch (error: any) {
         console.error("AI Generation Error:", error)
-        return { error: "Failed to generate notes." }
+        return { error: error.message || "Failed to generate notes." }
     }
 }
 
