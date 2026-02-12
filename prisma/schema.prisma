@@ -4,8 +4,8 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider = "sqlite"
+  url      = "file:./dev.db"
 }
 
 model User {
@@ -13,18 +13,7 @@ model User {
   email     String   @unique
   password  String
   name      String?
-  role      Role     @default(USER)
-  status    Status   @default(PENDING)
+  role      String   @default("USER")
+  status    String   @default("PENDING")
   createdAt DateTime @default(now())
-}
-
-enum Role {
-  ADMIN
-  USER
-}
-
-enum Status {
-  PENDING
-  APPROVED
-  REJECTED
 }

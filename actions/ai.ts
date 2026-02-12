@@ -1,49 +1,52 @@
 "use server"
 
 import { Innertube } from "youtubei.js"
+import { YoutubeTranscript } from "youtube-transcript"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
 
 export async function fetchVideoTranscript(videoUrl: string) {
-    try {
-        const videoId = extractVideoId(videoUrl)
-        if (!videoId) {
-            return { error: "Invalid YouTube URL" }
-        }
+    const videoId = extractVideoId(videoUrl)
+    if (!videoId) {
+        return { error: "Invalid YouTube URL" }
+    }
 
-        // Use Innertube (youtubei.js)
+    // Strategy 1: Try Innertube (youtubei.js) - Mimics a real client, good for restrictions
+    try {
+        console.log(`[AI] Attempting Strategy 1 (Innertube) for: ${videoId}`)
         const youtube = await Innertube.create();
         const info = await youtube.getInfo(videoId);
+        const transcriptData = await info.getTranscript();
 
-        try {
-            const transcriptData = await info.getTranscript();
-            if (
-                transcriptData &&
-                transcriptData.transcript &&
-                transcriptData.transcript.content &&
-                transcriptData.transcript.content.body &&
-                transcriptData.transcript.content.body.initial_segments
-            ) {
-                const transcriptText = transcriptData.transcript.content.body.initial_segments
-                    .map((seg: any) => seg.snippet.text)
-                    .join(" ");
-                return { transcript: transcriptText }
-            } else {
-                throw new Error("Transcript data missing");
-            }
-        } catch (innerError: any) {
-            const msg = innerError.message || "";
-            if (msg.includes("FAILED_PRECONDITION") || msg.includes("disabled")) {
-                return { error: "This video has disabled captions. Please use the Manual Input tab." }
-            }
-            throw innerError;
+        if (
+            transcriptData &&
+            transcriptData.transcript &&
+            transcriptData.transcript.content &&
+            transcriptData.transcript.content.body &&
+            transcriptData.transcript.content.body.initial_segments
+        ) {
+            const transcriptText = transcriptData.transcript.content.body.initial_segments
+                .map((seg: any) => seg.snippet.text)
+                .join(" ");
+            return { transcript: transcriptText }
         }
-
-    } catch (error) {
-        console.error("Transcript Error:", error)
-        return { error: error instanceof Error ? error.message : "Failed to fetch transcript" }
+    } catch (error: any) {
+        console.warn(`[AI] Strategy 1 failed: ${error.message}`)
     }
+
+    // Strategy 2: Try youtube-transcript - Lightweight scraper, good fallback
+    try {
+        console.log(`[AI] Attempting Strategy 2 (youtube-transcript) for: ${videoId}`)
+        const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId)
+        const transcriptText = transcriptItems.map((item) => item.text).join(" ")
+        return { transcript: transcriptText }
+    } catch (error: any) {
+        console.warn(`[AI] Strategy 2 failed: ${error.message}`)
+    }
+
+    // If both fail:
+    return { error: "Could not fetch transcript. Please use the 'Manual Text' tab to paste it manually." }
 }
 
 export async function generateNotes(transcriptText: string) {
