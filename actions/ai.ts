@@ -1,6 +1,6 @@
 "use server"
 
-import { YoutubeTranscript } from "youtube-transcript"
+import { Innertube } from "youtubei.js"
 import { GoogleGenerativeAI } from "@google/generative-ai"
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY || "")
@@ -12,10 +12,28 @@ export async function fetchVideoTranscript(videoUrl: string) {
             return { error: "Invalid YouTube URL" }
         }
 
-        const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId)
-        const transcriptText = transcriptItems.map((item) => item.text).join(" ")
+        // Use Innertube (youtubei.js)
+        const youtube = await Innertube.create();
+        const info = await youtube.getInfo(videoId);
 
-        return { transcript: transcriptText }
+        try {
+            const transcriptData = await info.getTranscript();
+            if (transcriptData && transcriptData.transcript && transcriptData.transcript.content) {
+                const transcriptText = transcriptData.transcript.content.body.initial_segments
+                    .map((seg: any) => seg.snippet.text)
+                    .join(" ");
+                return { transcript: transcriptText }
+            } else {
+                throw new Error("Transcript data missing");
+            }
+        } catch (innerError: any) {
+            const msg = innerError.message || "";
+            if (msg.includes("FAILED_PRECONDITION") || msg.includes("disabled")) {
+                return { error: "This video has disabled captions. Please use the Manual Input tab." }
+            }
+            throw innerError;
+        }
+
     } catch (error) {
         console.error("Transcript Error:", error)
         return { error: error instanceof Error ? error.message : "Failed to fetch transcript" }
