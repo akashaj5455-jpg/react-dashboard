@@ -18,7 +18,13 @@ export async function fetchVideoTranscript(videoUrl: string) {
 
         try {
             const transcriptData = await info.getTranscript();
-            if (transcriptData && transcriptData.transcript && transcriptData.transcript.content) {
+            if (
+                transcriptData &&
+                transcriptData.transcript &&
+                transcriptData.transcript.content &&
+                transcriptData.transcript.content.body &&
+                transcriptData.transcript.content.body.initial_segments
+            ) {
                 const transcriptText = transcriptData.transcript.content.body.initial_segments
                     .map((seg: any) => seg.snippet.text)
                     .join(" ");
